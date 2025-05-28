@@ -1,10 +1,11 @@
+import json
 from . import *
 from ..elements import *
 from inspector_packages import *
 from datetime import datetime
 from dash import no_update, ctx, Input, Output, State
 from .dash_layout import DashLayout
-   
+
 
 class DashCallbacks:
 
@@ -13,17 +14,29 @@ class DashCallbacks:
       land_color=None, 
       ocean_color=None, 
       resolution=None, 
-      classification=None):
+      classification=None,
+      cesium_config=None,
+      use_cesium=False):
 
       self._df = df
       self._timestamps = self._df["Timestamp"].unique()
       self._current_frame = self._df
+      self._cesium_config = cesium_config
 
       self._network_plot = NetworkPlot()
-      self._globe_plot = GlobePlot(df, land_color, ocean_color, resolution)
       self._globe_comms = GlobeComms()
-      self._dashboard = DashLayout(df, self._timestamps, classification, self._network_plot.figure_name)
+      self._dashboard = DashLayout(
+         df, 
+         self._timestamps, classification, 
+         self._network_plot.figure_name, 
+         cesium_config,
+         use_cesium)
       self._app = self._dashboard.get_app()
+
+      if use_cesium:
+         self._cesium_globe = CesiumJSGlobe(self._app)
+      else:
+         self._globe_plot = GlobePlot(df, land_color, ocean_color, resolution)
 
       self._internal_messages = ["MESSAGE_INTERNAL", "MESSAGE_INCOMING", "MESSAGE_OUTGOING"]
       self._external_messages = ["MESSAGE_DELIVERY_ATTEMPT", "MESSAGE_RECEIVED"]
@@ -71,10 +84,14 @@ class DashCallbacks:
          }
       }
 
+      if use_cesium:
+         self._define_cesium_filter_callback()
+      else:
+         self._define_filter_callback()
+
       self._define_barplot_callback()
       self._define_network_plot_callback()
       self._define_plot_select_callback()
-      self._define_filter_callback()
       self._define_filter_storage_callback()
       self._define_dropdown_options_callback()
       self._define_time_button_callback()
@@ -84,6 +101,25 @@ class DashCallbacks:
    def app(self):
 
       return self._app
+
+   def _get_current_data(self, value):
+
+      frame = self._current_frame
+
+      if ctx.triggered_id != TIME_SLIDER:
+         self._timestamps = frame["Timestamp"].unique()
+
+      if ctx.triggered_id != TIME_SLIDER:
+         frame = frame[frame["Timestamp"] == self._timestamps[0]]
+         current_time = datetime.utcfromtimestamp(self._timestamps[0]).strftime("%H:%M:%S.%f")[:-3]
+      else:
+         frame = frame[frame["Timestamp"] == value]
+         current_time = datetime.utcfromtimestamp(value).strftime("%H:%M:%S.%f")[:-3]
+
+      internal = frame[frame["Event_Type"].isin(self._internal_messages)]
+      external = frame[frame["Event_Type"].isin(self._external_messages)]
+
+      return (internal, external, current_time)
 
    def _filter_dataframe(self):
 
@@ -108,7 +144,7 @@ class DashCallbacks:
          if radio_val:
             return f"Current Time: {current_time}"
          else:
-            return "Bar Plots not tied to time!"
+            return "Plots not tied to time!"
 
 
    def _define_barplot_callback(self):
@@ -217,22 +253,9 @@ class DashCallbacks:
       )
       def filter_frame(value, filter_data):
 
-         frame = self._current_frame
-
-         if ctx.triggered_id != TIME_SLIDER:
-            self._timestamps = frame["Timestamp"].unique()
-
-         if ctx.triggered_id != TIME_SLIDER:
-            frame = frame[frame["Timestamp"] == self._timestamps[0]]
-            current_time = datetime.utcfromtimestamp(self._timestamps[0]).strftime("%H:%M:%S.%f")[:-3]
-         else:
-            frame = frame[frame["Timestamp"] == value]
-            current_time = datetime.utcfromtimestamp(value).strftime("%H:%M:%S.%f")[:-3]
+         internal, external, current_time = self._get_current_data(value)
 
          update = []
-
-         internal = frame[frame["Event_Type"].isin(self._internal_messages)]
-         external = frame[frame["Event_Type"].isin(self._external_messages)]
          if not external.empty:
             transmission_plots, transmission_directions = self._globe_comms.update_external_events(external, current_time)
             update.extend(transmission_directions)
@@ -252,6 +275,67 @@ class DashCallbacks:
             return fig, self._timestamps[0], self._timestamps[-1], self._timestamps[0], slider_marks
          else:
             return fig, no_update, no_update, no_update, no_update
+
+   def _define_cesium_filter_callback(self):
+
+      @self._app.callback(
+         [Output(CESIUM_EXTERNAL, 'data'), Output(CESIUM_INTERNAL, 'data'), Output(CESIUM_CAMERA, 'data'),
+         Output(TIME_SLIDER, 'min'), Output(TIME_SLIDER, 'max'),
+         Output(TIME_SLIDER, 'value'), Output(TIME_SLIDER, 'marks')],
+         Input(TIME_SLIDER, 'value'),
+         Input(DISPLAY_MEMORY, 'data'),
+      )
+      def cesium_globe_callback(value, filter_data):
+
+         internal, external, current_time = self._get_current_data(value)
+
+         external_json = {}
+         if not external.empty:
+            group_idx = 1
+            for transmission, group in external.groupby(["Sender_Name", "SenderPart_Name", "Receiver_Name", "ReceiverPart_Name"]):
+               
+               x, y, z = CesiumJSGlobe.get_line_points(group)
+               
+               external_json[f"group_{group_idx}"] = {
+                  "transmission": list(transmission), 
+                  "info": group.to_dict(),
+                  "line_points": {"x": x, "y": y, "z": z},
+                  "current_time": current_time
+                  }
+
+               group_idx += 1
+
+         internal_json = {}
+         if not internal.empty:
+            for sender, group in internal.groupby("Sender_Name"):
+               internal_json[sender] = {
+                  "info": group.to_dict(),
+                  "current_time": current_time
+               }
+
+         camera_view = CesiumJSGlobe.set_camera_view(internal, external)
+
+         if ctx.triggered_id != TIME_SLIDER and len(self._timestamps) != 0:
+            slider_marks = {}
+            for val in self._timestamps:
+               slider_marks[val] = '' 
+            return [
+               json.dumps(external_json), 
+               json.dumps(internal_json), 
+               json.dumps(camera_view), 
+               self._timestamps[0], 
+               self._timestamps[-1], 
+               self._timestamps[0], 
+               slider_marks]
+         else:
+            return [
+               json.dumps(external_json), 
+               json.dumps(internal_json), 
+               json.dumps(camera_view), 
+               no_update, 
+               no_update, 
+               no_update, 
+               no_update]
 
 
    def _define_filter_storage_callback(self):

@@ -35,6 +35,10 @@ class BarPlot:
             )
          subplot_grp += 1
 
-      fig.update_layout(barmode='stack', showlegend=False)
+      fig.update_layout(
+         barmode='stack', 
+         paper_bgcolor='rgba(0,0,0,0)', 
+         plot_bgcolor='rgba(0,0,0,0)',
+         showlegend=False)
 
       return fig

@@ -66,7 +66,7 @@ class NetworkPlot:
    def _get_network_layout(self, frame, network_layout):
 
       transmissions = frame[["Sender_Name", "Receiver_Name"]].drop_duplicates()
-      edges = [(row[0], row[1]) for _, row in transmissions.iterrows()]
+      edges = [(row["Sender_Name"], row["Receiver_Name"]) for _, row in transmissions.iterrows()]
       G = nx.Graph()
       G.add_edges_from(edges)
 

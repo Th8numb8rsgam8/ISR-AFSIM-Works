@@ -1,16 +1,19 @@
+import subprocess
 import sys, os, shutil
-import subprocess, json
 from pathlib import Path
+from utils import cli_output
 from dateutil import parser
 import pandas as pd
+
 
 class Executor:
 
 
-   def __init__(self, program_file, communications_data):
+   def __init__(self, mission_config):
 
-      self._program_file = program_file
-      self._input_file = communications_data
+      self._program_file = Path(sys.argv[0])
+      self._mission_config = mission_config
+      self._output_dir = self._program_file.parent.joinpath("output")
 
       self._required_events = [
          "enable SIMULATION_STARTING SetupParameters",
@@ -33,61 +36,50 @@ class Executor:
       }
 
 
-   def handle_input_file(self):
+   def get_afsim_data(self):
 
-      if not self._input_file.is_file():
-         print(f'{self._input_file.absolute()} is not a file.')
-         sys.exit(1)
-
-      if not self._input_file.exists():
-         print(f'{self._input_file.absolute()} file does not exist.')
-         sys.exit(1)
-
-      if os.path.basename(self._input_file.absolute()).endswith(".json"):
+      if (self._mission_config["run_mission"]):
          self._execute_mission()
-         return self._configure_data(ran_mission=True)
-      elif os.path.basename(self._input_file.absolute()).endswith(".csv"):
-         return self._configure_data(ran_mission=False)
-      else:
-         print(f'{self._input_file.absolute()} is not JSON or CSV.')
-         sys.exit(1)
-
+      
+      return self._configure_data()
 
    def _execute_mission(self):
 
-      with open(self._input_file, "r") as f:
-         input_config = json.load(f)
-         observer_string = "\n   ".join(["observer", *self._required_events])
-         for key, enabled in input_config["message_events"].items():
-            if enabled:
-               observer_string = "\n   ".join([observer_string, self._message_events[key]])
-            else:
-               observer_string = "\n   ".join([observer_string, "# " + self._message_events[key]])
-         observer_string += "\nend_observer"
+      observer_string = "\n   ".join(["observer", *self._required_events])
+      for key, enabled in self._mission_config["message_events"].items():
+         if enabled:
+            observer_string = "\n   ".join([observer_string, self._message_events[key]])
+         else:
+            observer_string = "\n   ".join([observer_string, "# " + self._message_events[key]])
+      observer_string += "\nend_observer"
 
       with open(self._program_file.parent.joinpath("utils", "comm_detail_collector.txt"), "r") as collector:
          collector_string = collector.read()
          
-      comms_file = self._program_file.parent.joinpath("comms_analysis.afsim")
-      startup_file = Path(input_config["scenario_startup"])
+      output_name = self._mission_config["output_name"]
+      comms_file = self._program_file.parent.joinpath(output_name + ".afsim")
+      startup_file = Path(self._mission_config["scenario_startup"])
       include_doc = "include_once " + str(startup_file.absolute().as_posix()) 
       with open(comms_file, "w") as f:
          f.write("\n".join([include_doc, collector_string, observer_string]))
 
-      print(f"\033[32mRunning mission for {startup_file}...\033[0;0m")
+      cli_output.INFO(f"Running mission for {startup_file}...")
       mission_result = subprocess.run(
-         [input_config["mission_exe_path"], str(comms_file.absolute())], 
+         [self._mission_config["mission_exe_path"], str(comms_file.absolute())], 
          cwd=str(startup_file.parent))
 
       if mission_result.returncode != 0:
-         print("\033[31mMission execution error... exiting!\033[0;0m")
+         cli_output.FATAL("Mission execution error... exiting!")
          sys.exit(1)
 
-      print(f"\033[32mMission execution of {startup_file} successfully completed.\033[0;0m")
+      cli_output.OK(f"Mission execution of {startup_file} successfully completed.")
       os.remove(comms_file)
+
+      if not self._output_dir.exists():
+         os.mkdir(self._output_dir)
       shutil.move(
          startup_file.parent.joinpath("comms_analysis.csv"),
-         self._program_file.parent.joinpath("comms_analysis.csv"))
+         self._output_dir.joinpath(output_name + ".csv"))
 
 
    def _configure_data(self, ran_mission=True):
@@ -120,10 +112,12 @@ class Executor:
          'Queue_Size': -1
          }
 
-      if ran_mission:
-         csv_file_path = self._program_file.parent.joinpath("comms_analysis.csv")
-      else:
-         csv_file_path = self._input_file
+      output_name = self._mission_config["output_name"]
+      csv_file_path = self._output_dir.joinpath(output_name + ".csv")
+
+      if not csv_file_path.exists():
+         cli_output.FATAL(f"{csv_file_path.absolute()} does not exist... exiting!")
+         sys.exit(1)
 
       df = pd.read_csv(csv_file_path).fillna(value=substitutions)
       df["Timestamp"] = df["ISODate"].apply(lambda x: parser.isoparse(x).timestamp())

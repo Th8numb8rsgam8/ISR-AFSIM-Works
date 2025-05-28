@@ -1,0 +1,28 @@
+{
+   "mission": 
+   {
+      "run_mission": false,
+      "mission_exe_path": "C:\\Users\\ikeene\\Downloads\\AFSIM-2.2311.2+lts-x64-windows\\swdev\\build\\Release\\mission.exe",
+      "scenario_startup": "C:\\Users\\ikeene\\Downloads\\AFSIM-2.2311.2+lts-x64-windows\\demos\\satellite_demos\\iridium_demo.afsim",
+      "output_name": "iridium_demo",
+      "message_events": {
+         "MESSAGE_OUTGOING": true,
+         "MESSAGE_INCOMING": true,
+         "MESSAGE_INTERNAL": true,
+         "MESSAGE_DELIVERY_ATTEMPT": true,
+         "MESSAGE_DISCARDED": true,
+         "MESSAGE_FAILED_ROUTING": true,
+         "MESSAGE_HOP": true,
+         "MESSAGE_UPDATED": true,
+         "MESSAGE_QUEUED": true,
+         "MESSAGE_RECEIVED": true,
+         "MESSAGE_TRANSMITTED": true,
+         "MESSAGE_TRANSMITTED_HEARTBEAT": true,
+         "MESSAGE_TRANSMIT_ENDED": true
+      }
+   },
+   "cesium":
+   {
+      "cesium_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxMTk4MTU0Yy0wMjYwLTQxMmMtYWExZS1lOWQ4OTJmMjk2ZjQiLCJpZCI6MzMwMjY2LCJpYXQiOjE3NTQ3MTg1Njh9.quMhQBq7uVEYO26NU0IWaG9fxz-pgncbdankLrGfSGE"
+   }
+}

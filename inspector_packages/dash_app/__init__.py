@@ -1,4 +1,4 @@
-APP_NAME = "AFSIM Comms Inspector"
+APP_NAME = "ISR-AFSIM Works"
 
 MAIN_DISPLAY = "main-display"
 DISPLAYED_DATA = "displayed-data"
@@ -6,6 +6,11 @@ FILTER_MEMORY = "filter-memory"
 DISPLAY_MEMORY = "display-memory"
 
 GLOBE_GRAPH = "globe-graph"
+CESIUM_EXTERNAL = "cesium-external"
+CESIUM_INTERNAL = "cesium-internal"
+CESIUM_VIEWER = "cesium-viewer"
+CESIUM_CONFIG = "cesium-config"
+CESIUM_CAMERA = "cesium-camera"
 PLOT_FILTERS = "plot-filters"
 
 PLOTS_AREA = "plots-area"

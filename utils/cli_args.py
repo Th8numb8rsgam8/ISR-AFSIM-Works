@@ -1,7 +1,6 @@
 import argparse
 import matplotlib.colors as colors
 
-import pdb
 
 class CLIParser:
 
@@ -21,21 +20,22 @@ class CLIParser:
    def _parse_arguments(self):
 
       cli_parser = argparse.ArgumentParser(
-         prog="AFSIM Communications Inspector",
+         prog="ISR-AFSIM Works",
          formatter_class=argparse.RawDescriptionHelpFormatter,
          description=
          '''
          This application helps to visualize and perform exploratory
-         analysis of AFSIM communications with the following features:
-         1. Globe visualization of platforms
+         analysis of AFSIM ISR processes with the following features:
+         1. Globe visualization of platforms with Plotly & CesiumJS
          2. Ability to filter communications data for a focused analysis.
+         3. Bar Plots & 2D Network Plots
          ''')
 
       cli_parser.add_argument(
-         "communications_data",
+         "config_file",
          metavar="C:/path/to/file",
          type=str,
-         help="JSON Config file or CSV file path to AFSIM communications data."
+         help="JSON Config file to AFSIM execution and collection instructions."
       )
 
       cli_parser.add_argument(
@@ -73,9 +73,33 @@ class CLIParser:
          metavar="CUI",
          dest="classification",
          type=str,
-         default="CUI",
+         default=None,
          help="Classification of data used"
       )
+      cli_parser.add_argument(
+         "-Cs", "--cesium",
+         dest="use_cesium",
+         action="store_true",
+         help="Flag to use CesiumJS as globe visualizer instead of Plotly."
+      )
 
-      cli_parser.add_argument("--version", action="version", version='%(prog)s 0.0.1')
+      cli_parser.add_argument("--version", action="version", version='%(prog)s 1.0.0')
       self._arguments = vars(cli_parser.parse_args())
+
+
+class cli_output:
+
+   def INFO(text):
+      print(f'\033[1;37m {text} \033[0;0m')
+
+    
+   def OK(text):
+      print(f'\033[1;32m {text} \033[0;0m')
+
+
+   def WARNING(text):
+      print(f'\033[1;33m {text} \033[0;0m')
+
+
+   def FATAL(text):
+      print(f'\033[1;31m {text} \033[0;0m')

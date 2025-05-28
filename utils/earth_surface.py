@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 
-import pdb
 
 def degree2radians(degree):
     #convert degrees to radians

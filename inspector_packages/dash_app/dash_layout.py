@@ -5,12 +5,20 @@ from dash import dcc, html, Dash
 
 class DashLayout:
 
-   def __init__(self, df, timestamps, classification, network_plot_name):
+   def __init__(self, 
+      df, 
+      timestamps, 
+      classification, 
+      network_plot_name,
+      cesium_config=None,
+      use_cesium=False):
 
       self._df = df
       self._timestamps = timestamps
       self._classification = classification
       self._network_plot_name = network_plot_name
+      self._cesium_config = cesium_config
+      self._use_cesium = use_cesium
 
       self._app = Dash(
          title=APP_NAME,
@@ -74,7 +82,7 @@ class DashLayout:
 
    def initialize_network_options(self):
 
-      network_options = ["Spring", "Circular", "Shell", "Spectral", "Random", "Kamada Kawai", "Multipartite"]
+      network_options = ["Spring", "Circular", "Shell", "Spectral", "Random"]
 
       network_dropdowns = dbc.AccordionItem([
          self._create_dropdown("Network Layout", NETWORK_LAYOUT, network_options, False, None, "Spring", False),
@@ -98,10 +106,33 @@ class DashLayout:
                ]
             ),
             dcc.Store(id=FILTER_MEMORY),
-            dcc.Store(id=DISPLAY_MEMORY)
+            dcc.Store(id=DISPLAY_MEMORY),
+            *self._add_cesium_elements(),
          ],
          target_components={MAIN_DISPLAY: "children"},
       )
+
+   def _add_cesium_elements(self):
+
+      elements = [
+         dcc.Store(id=CESIUM_VIEWER), 
+         dcc.Store(id=CESIUM_CONFIG, data=self._cesium_config),
+         dcc.Store(id=CESIUM_CAMERA),
+         dcc.Store(id=CESIUM_EXTERNAL),
+         dcc.Store(id=CESIUM_INTERNAL),
+         html.Div(
+            id="tooltip",
+            style={
+               'position': 'absolute',
+               'display': 'none',
+               'background': 'white',
+               'padding': '5px',
+               'border': '1px solid black'
+            }
+         )
+      ]
+
+      return elements if self._use_cesium else []
 
 
    def _create_classification_markings(self, pos):
@@ -170,7 +201,7 @@ class DashLayout:
    def _create_dataframe_message(self):
 
       df_message = html.Div(
-         "AFSIM Communications Inspector",
+         "ISR-AFSIM Works",
          id="empty-dataframe-message",
          style={
             'position': 'fixed',
@@ -192,12 +223,13 @@ class DashLayout:
 
    def _create_globe_visual(self):
 
-      graph = dcc.Graph(
+      if self._use_cesium:
+         return html.Div(id=GLOBE_GRAPH, style={'height': '80vh'})
+      else:
+         return dcc.Graph(
          id=GLOBE_GRAPH, 
          config={"scrollZoom": True}, 
          style={'height': '80vh'})
-
-      return graph
 
 
    def _create_slider(self):

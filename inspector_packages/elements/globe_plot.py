@@ -2,14 +2,13 @@ import pickle, warnings
 from pathlib import Path
 import pandas as pd
 from inspector_packages import *
-import pdb
+from .globe_methods import GlobeMethods
+
 
 class GlobePlot:
 
    def __init__(self, df, land_color, ocean_color, resolution):
 
-      self._equator_radius = 6.378 * 10**6
-      self._polar_radius = 6.357 * 10**6
       self._camera_view = {"x": 3, "y": 0, "z": 0}
 
       self._current_file = Path(__file__) 
@@ -74,9 +73,9 @@ class GlobePlot:
       theta = np.linspace(0, 2 * np.pi, self._earth_image.shape[0]) + np.pi
       phi = np.linspace(0, np.pi, self._earth_image.shape[1])
 
-      self._earth_x = self._equator_radius * np.outer(np.cos(theta), np.sin(phi))
-      self._earth_y = self._equator_radius * np.outer(np.sin(theta), np.sin(phi))
-      self._earth_z = self._polar_radius * np.outer(np.ones(np.size(theta)), np.cos(phi))
+      self._earth_x = GlobeMethods.EQUATOR_RADIUS * np.outer(np.cos(theta), np.sin(phi))
+      self._earth_y = GlobeMethods.EQUATOR_RADIUS * np.outer(np.sin(theta), np.sin(phi))
+      self._earth_z = GlobeMethods.POLAR_RADIUS * np.outer(np.ones(np.size(theta)), np.cos(phi))
 
 
    def _set_earth_surface(self, land_color, ocean_color, resolution):
@@ -104,8 +103,8 @@ class GlobePlot:
       z_limit = df[["SenderLocation_Z", "ReceiverLocation_Z"]].abs().max().max()
 
       self._axes_range = [
-         -max(x_limit, y_limit, z_limit, self._equator_radius),
-         max(x_limit, y_limit, z_limit, self._equator_radius)
+         -max(x_limit, y_limit, z_limit, GlobeMethods.EQUATOR_RADIUS),
+         max(x_limit, y_limit, z_limit, GlobeMethods.EQUATOR_RADIUS)
       ]
 
 
