@@ -31,7 +31,20 @@ class AFSIMCommsInspector:
       self._internal_messages = ["MESSAGE_INTERNAL", "MESSAGE_INCOMING", "MESSAGE_OUTGOING"]
       self._external_messages = ["MESSAGE_DELIVERY_ATTEMPT", "MESSAGE_RECEIVED"]
 
-      self._transmission_interval = 50000
+      self._transmission_arrows = [
+          {"range": [0, 1000], "scaling": None, "interval": None},
+          {"range": [1000, 10000], "scaling": 0.8, "interval":  100},
+          {"range": [10000, 50000], "scaling": 0.77, "interval":  1000},
+          {"range": [50000, 100000], "scaling": 0.74, "interval":  5000},
+          {"range": [100000, 500000], "scaling": 0.71, "interval":  10000},
+          {"range": [500000, 1000000], "scaling": 0.68, "interval":  50000},
+          {"range": [1000000, 5000000], "scaling": 0.65, "interval":  100000},
+          {"range": [5000000, 10000000], "scaling": 0.4, "interval":  500000},
+          {"range": [10000000, 50000000], "scaling": 0.35, "interval":  1000000},
+          {"range": [10000000, 50000000], "scaling": 0.35, "interval":  1000000},
+          {"range": [50000000, sys.maxsize], "scaling": 0.3, "interval":  5000000},
+      ]
+
       self._transmission_result = {
          "Success": {"color_name": "mediumturquoise", "rgb": [72, 209, 204]},
          "Fail": {"color_name": "darkred", "rgb": [139, 0, 0]}
@@ -782,7 +795,17 @@ class AFSIMCommsInspector:
          group["ReceiverLocation_Z"].values[0]])
          
       platform_range = group["SenderToRcvr_Range"].values[0]
-      num_arrows, remainder = divmod(platform_range, self._transmission_interval)
+
+      interval = None
+      scaling = None
+      for rng_step in self._transmission_arrows:
+          min_rng, max_rng = rng_step["range"]
+          if min_rng < platform_range <= max_rng:
+              interval = rng_step["interval"]
+              scaling = rng_step["scaling"]
+              break
+
+      num_arrows, remainder = divmod(platform_range, interval if interval is not None else platform_range + 1)
       delta = (0.5 * remainder / platform_range) * (receiver_location - sender_location)
       first_arrow = sender_location + delta
       last_arrow = receiver_location - delta
@@ -812,13 +835,14 @@ class AFSIMCommsInspector:
             u.append(vector[0])
             v.append(vector[1])
             w.append(vector[2])
-            arrows = {
-               "arrow_x": arrow_x,
-               "arrow_y": arrow_y,
-               "arrow_z": arrow_z,
-               "u": u, "v": v, "w": w
-            }
-            line_data["arrows"] = arrows
+         arrows = {
+            "scaling": scaling,
+            "arrow_x": arrow_x,
+            "arrow_y": arrow_y,
+            "arrow_z": arrow_z,
+            "u": u, "v": v, "w": w
+         }
+         line_data["arrows"] = arrows
 
 
       return line_data
@@ -877,7 +901,7 @@ class AFSIMCommsInspector:
                   "v": line_data["arrows"]["v"],
                   "w": line_data["arrows"]["w"],
                   "sizemode": "scaled",
-                  "sizeref": 0.3,
+                  "sizeref": line_data["arrows"]["scaling"],
                   "colorscale": [
                      [0, self._transmission_result[success]["color_name"]],
                      [1, self._transmission_result[success]["color_name"]],
@@ -971,7 +995,6 @@ class AFSIMCommsInspector:
          bar_graph_category, bar_stack_category,
          filter_data, radio_val):
 
-         print("BARPLOT")
          frame = self._current_frame
 
          if radio_val:
@@ -1025,7 +1048,6 @@ class AFSIMCommsInspector:
       )
       def filter_frame(value, filter_data):
 
-         print("FILTERING")
          frame = self._current_frame
 
          if ctx.triggered_id != "time-slider":
@@ -1119,8 +1141,6 @@ class AFSIMCommsInspector:
          self._filter_options["ReceiverPart_Type"] = rcvr_part_type
          self._filter_options["ReceiverPart_BaseType"] = rcvr_part_basetype
 
-         print("STORING")
-
          self._current_frame = self._filter_dataframe()
 
          data = {"frame_filtered": True}
@@ -1152,8 +1172,6 @@ class AFSIMCommsInspector:
          prevent_initial_call=True
       )
       def update_dropdown_options(filter_data):
-
-         print("FILTER UPDATE")
 
          options = [] 
          for column in self._filter_options:
