@@ -1,4 +1,3 @@
-import math
 import subprocess
 import json, pickle
 import shutil, os, sys
@@ -6,6 +5,7 @@ import webbrowser, warnings
 from datetime import datetime
 from dateutil import parser
 from utils.cli_args import CLIParser
+from elements.network_plot import NetworkPlot
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -25,11 +25,18 @@ class AFSIMCommsInspector:
       resolution=None,
       classification=None):
 
+      self._network_plot = NetworkPlot()
+
       self._host = "127.0.0.1"
       self._port = 8050
 
       self._internal_messages = ["MESSAGE_INTERNAL", "MESSAGE_INCOMING", "MESSAGE_OUTGOING"]
       self._external_messages = ["MESSAGE_DELIVERY_ATTEMPT", "MESSAGE_RECEIVED"]
+
+      self._plots_options = {
+         "Bar Plot": {"Graph": self._initialize_barplot(), "Options": self._initialize_barplot_options()},
+         "Network Plot": {"Graph": self._initialize_network_plot(), "Options": self._initialize_network_options()}
+      }
 
       self._transmission_arrows = [
           {"range": [0, 1000], "scaling": None, "interval": None},
@@ -44,6 +51,26 @@ class AFSIMCommsInspector:
           {"range": [10000000, 50000000], "scaling": 0.35, "interval":  1000000},
           {"range": [50000000, sys.maxsize], "scaling": 0.3, "interval":  5000000},
       ]
+
+      self._empty_plot = {
+         "paper_bgcolor":'rgba(0,0,0,0)',
+         "plot_bgcolor":'rgba(0,0,0,0)',
+         "xaxis": 
+         {
+            "showgrid": False,
+            "showticklabels": False,
+            "ticks":'',
+            "zeroline":False
+         },
+         "yaxis": 
+         {
+            "showgrid": False,
+            "showticklabels": False,
+            "ticks":'',
+            "zeroline":False
+         }
+      }
+
 
       self._transmission_result = {
          "Success": {"color_name": "mediumturquoise", "rgb": [72, 209, 204]},
@@ -73,7 +100,6 @@ class AFSIMCommsInspector:
       self._file_dir = Path(__file__)
       self._classification = classification
 
-
       self._handle_input_file(communications_data) 
 
       self._app = Dash(
@@ -99,6 +125,8 @@ class AFSIMCommsInspector:
       self._set_dash_layout()
 
       self._define_barplot_callback()
+      self._define_network_plot_callback()
+      self._define_plot_select_callback()
       self._define_filter_callback()
       self._define_filter_storage_callback()
       self._define_dropdown_options_callback()
@@ -223,6 +251,8 @@ class AFSIMCommsInspector:
          "ReceiverPart_Type": self._df["ReceiverPart_Type"].unique(),
          "ReceiverPart_BaseType": self._df["ReceiverPart_BaseType"].unique()
       }
+
+      self._platform_type_colorscale()
 
 
    def _load_earth_data(self, land_color=None, ocean_color=None, resolution=None):
@@ -375,6 +405,16 @@ class AFSIMCommsInspector:
          }
       )
 
+
+   def _platform_type_colorscale(self):
+
+      self._platform_type_colors = {}
+      platform_types = set(self._df["Sender_Type"].to_list() + self._df["Receiver_Type"].to_list())
+      color_codes = np.linspace(0, 1, len(platform_types))
+      for idx, platform_type in enumerate(platform_types):
+         self._platform_type_colors[platform_type] = color_codes[idx]
+
+
    def _create_dropdown(self, col_name, dropdown_id, options, multi, placeholder=None, value=None, clearable=True):
 
       dropdown = html.Div(
@@ -505,24 +545,35 @@ class AFSIMCommsInspector:
       return time_label
 
 
-   def _create_bar_subplots(self):
+   def _create_plots_area(self):
 
-      bar_plots = html.Div(
-         style={
-            'overflowY': 'scroll',
-            'height': '80vh'
-         },
-         children=[dcc.Graph(
-            id='bar-graph', 
-            config={"scrollZoom": False}, 
-            style={'height': '200vh'}
-         )]
+      bar_plots = dcc.Loading(
+         children=[html.Div(
+            id='plots-area',
+            style={
+               'overflowY': 'scroll',
+               'height': '80vh'
+            },
+         )],
+         target_components={
+            "bar-graph": "figure",
+            self._network_plot.figure_name: "figure"},
+         type="graph"
       )
-
+      
       return bar_plots
 
+   def _initialize_barplot(self):
 
-   def _create_subplot_filters(self):
+      barplot = dcc.Graph(
+         id='bar-graph', 
+         config={"scrollZoom": False}, 
+         style={'height': '200vh'}
+      )
+
+      return barplot
+
+   def _initialize_barplot_options(self):
 
       subplot_options = [
          "ISODate", "Event_Type", "Message_SerialNumber", "Message_Originator",
@@ -536,14 +587,39 @@ class AFSIMCommsInspector:
          "CommInteraction_Succeeded", "CommInteraction_Failed",
          "CommInteraction_FailedStatus", "Queue_Size"]
 
-      subplot_filters = dbc.Accordion(
-         children=[dbc.AccordionItem([
-            self._create_dropdown("Subplot Category", "subplot-category", subplot_options, False, None, "Event_Type", False),
-            self._create_dropdown("Bar Graph Category", "bar-graph-category", subplot_options, False, None, "Sender_Name", False),
-            self._create_dropdown("Bar Stack Category", 'bar-stack-category', subplot_options, False, None, "Receiver_Name", False)
-         ], title="Bar Charts Options")],
-         start_collapsed=True 
-      )
+      barplot_dropdowns = dbc.AccordionItem([
+         self._create_dropdown("Subplot Category", "subplot-category", subplot_options, False, None, "Event_Type", False),
+         self._create_dropdown("Bar Graph Category", "bar-graph-category", subplot_options, False, None, "Sender_Name", False),
+         self._create_dropdown("Bar Stack Category", 'bar-stack-category', subplot_options, False, None, "Receiver_Name", False)
+      ], title="Bar Charts Options")
+
+      return barplot_dropdowns
+
+
+   def _initialize_network_plot(self):
+
+      network_plot = dcc.Graph(
+         id=self._network_plot.figure_name, 
+         config={"scrollZoom": True}, 
+         style={"height": "80vh"})
+
+      return network_plot
+
+
+   def _initialize_network_options(self):
+
+      network_options = ["Spring", "Circular", "Shell", "Spectral", "Random", "Kamada Kawai", "Multipartite"]
+
+      network_dropdowns = dbc.AccordionItem([
+         self._create_dropdown("Network Layout", "network-layout", network_options, False, None, "Spring", False),
+      ], title="Network Options")
+
+      return network_dropdowns
+
+
+   def _create_plot_filters(self):
+
+      subplot_filters = dbc.Accordion(id="plot-filters", start_collapsed=True)
 
       return subplot_filters
 
@@ -599,6 +675,7 @@ class AFSIMCommsInspector:
 
       return button_group
 
+
    def _create_dataframe_message(self):
 
       df_message = html.Div(
@@ -636,7 +713,8 @@ class AFSIMCommsInspector:
                self._create_time_buttons()
             ], width=6),
             dbc.Col([
-               self._create_bar_subplots(),
+               self._create_dropdown("Plots", "plot-options", ["Bar Plot", "Network Plot"], False, False, "Bar Plot", False),
+               self._create_plots_area(),
                self._create_time_label(),
                self._create_button_group()
             ], width=6)
@@ -647,7 +725,7 @@ class AFSIMCommsInspector:
    def _create_options_row(self):
 
       options_row = dbc.Row(
-         id="options_row",
+         id="options-row",
          style={
             'position': 'relative',
             'textAlign': 'center',
@@ -655,7 +733,7 @@ class AFSIMCommsInspector:
          },
          children=[
             dbc.Col(self._create_filter_options(), width=6),
-            dbc.Col(self._create_subplot_filters(), width=6),
+            dbc.Col(self._create_plot_filters(), width=6),
          ]
       )
 
@@ -844,7 +922,6 @@ class AFSIMCommsInspector:
          }
          line_data["arrows"] = arrows
 
-
       return line_data
 
    def _marker_color(self, num_markers, success):
@@ -987,7 +1064,6 @@ class AFSIMCommsInspector:
          Input("bar-graph-category", "value"),
          Input("bar-stack-category", "value"),
          Input("display-memory", "data"),
-         # Input("filter-memory", "data"),
          Input('radios', 'value')
       )
       def update_barplots(
@@ -1003,7 +1079,185 @@ class AFSIMCommsInspector:
          if not frame.empty:
             return self._generate_barplots(frame, subplot_category, bar_graph_category, bar_stack_category)
          else:
-            return no_update
+            return go.Figure({"data": None, "layout": self._empty_plot})
+
+
+   def _define_network_plot_callback(self):
+
+         @self._app.callback(
+            Output(self._network_plot.figure_name, "figure"),
+            Input("time-slider", "value"),
+            Input("network-layout", "value"),
+            Input("display-memory", "data"),
+            Input('radios', 'value')
+         )
+         def update_network_plot(time_value, network_layout, filter_data, radio_val):
+
+            frame = self._current_frame
+
+            if radio_val:
+               frame = frame[frame["Timestamp"] == time_value]
+
+            frame = frame[frame["Event_Type"].isin(self._external_messages)]
+            if not frame.empty:
+               return self._network_plot.generate_network_figure(frame, network_layout, self._empty_plot)
+            else:
+               return go.Figure({"data": None, "layout": self._empty_plot})
+
+
+   # def _define_network_plot_callback(self):
+
+   #    @self._app.callback(
+   #       Output("network-graph", "figure"),
+   #       Input("time-slider", "value"),
+   #       Input("network-layout", "value"),
+   #       Input("display-memory", "data"),
+   #       Input('radios', 'value')
+   #    )
+   #    def update_network_plot(time_value, network_layout, filter_data, radio_val):
+
+   #       frame = self._current_frame
+
+   #       if radio_val:
+   #          frame = frame[frame["Timestamp"] == time_value]
+
+   #       frame = frame[frame["Event_Type"].isin(self._external_messages)]
+   #       if not frame.empty:
+   #          transmissions = frame[["Sender_Name", "Receiver_Name"]].drop_duplicates()
+   #          edges = [(row[0], row[1]) for _, row in transmissions.iterrows()]
+   #          G = nx.Graph()
+   #          G.add_edges_from(edges)
+
+   #          if network_layout == "Spring":
+   #             node_positions = nx.spring_layout(G)
+   #          elif network_layout == "Circular":
+   #             node_positions = nx.circular_layout(G)
+   #          elif network_layout == "Shell":
+   #             node_positions = nx.shell_layout(G)
+   #          elif network_layout == "Spectral":
+   #             node_positions = nx.spectral_layout(G)
+   #          elif network_layout == "Random":
+   #             node_positions = nx.random_layout(G)
+
+   #          node_x, node_y, node_color, node_text, nodes_visited = {}, {}, {}, {}, []
+   #          edge_width = []
+   #          nodes_traces, edge_traces, directions = [], [], []
+   #          for transmission, group in frame.groupby(["Sender_Name", "Receiver_Name"]):
+
+   #             sender, receiver = transmission[0], transmission[1]
+   #             sender_type = group["Sender_Type"].iloc[0]
+   #             receiver_type = group["Receiver_Type"].iloc[0]
+
+   #             if sender not in nodes_visited:
+   #                if sender_type not in node_x:
+   #                   node_x[sender_type] = []
+   #                   node_y[sender_type] = []
+   #                   node_color[sender_type] = []
+   #                   node_text[sender_type] = []
+   #                pos = node_positions[sender]
+   #                node_x[sender_type].append(pos[0])
+   #                node_y[sender_type].append(pos[1])
+   #                node_text[sender_type].append(f"{sender}" + "<extra></extra>")
+   #                nodes_visited.append(sender)
+
+   #             if receiver not in nodes_visited:
+   #                if receiver_type not in node_x:
+   #                   node_x[receiver_type] = []
+   #                   node_y[receiver_type] = []
+   #                   node_color[receiver_type] = []
+   #                   node_text[receiver_type] = []
+   #                pos = node_positions[receiver]
+   #                node_x[receiver_type].append(pos[0])
+   #                node_y[receiver_type].append(pos[1])
+   #                node_text[receiver_type].append(f"{receiver}" + "<extra></extra>")
+   #                nodes_visited.append(receiver)
+
+   #             edge_width = 1
+   #             for rng_step in self._edge_width:
+   #                min_rng, max_rng = rng_step["range"]
+   #                if min_rng < group.shape[0] <= max_rng:
+   #                   edge_width = rng_step["width"]
+   #                   break
+
+   #             edge_traces.append(
+   #                {
+   #                   "type": "scatter",
+   #                   "name": "edge",
+   #                   "x": [node_positions[sender][0], node_positions[receiver][0]],
+   #                   "y": [node_positions[sender][1], node_positions[receiver][1]],
+   #                   "mode": "lines",
+   #                   "zorder": 1,
+   #                   "line": 
+   #                   {
+   #                      "width": edge_width,
+   #                      "color": "black"
+   #                   },
+   #                   "showlegend": False
+   #                }
+   #             )
+
+   #             arrow_start = node_positions[sender] + 0.25 * (node_positions[receiver] - node_positions[sender])
+   #             arrow_end = node_positions[sender] + 0.75 * (node_positions[receiver] - node_positions[sender])
+   #             directions.append(
+   #                {
+   #                   "type": "scatter",
+   #                   "name": "network",
+   #                   "x": [arrow_start[0], arrow_end[0]], 
+   #                   "y": [arrow_start[1], arrow_end[1]],
+   #                   "mode": "markers",
+   #                   "zorder": 1,
+   #                   "customdata": [f"{group.shape[0]}" + "<extra></extra>", f"{group.shape[0]}" + "<extra></extra>"],
+   #                   "hovertemplate":'%{customdata}',
+   #                   "marker":
+   #                   {
+   #                      "size": 15,
+   #                      "color": "black",
+   #                      "symbol": "arrow-up",
+   #                      "angleref": "previous"
+   #                   },
+   #                   "showlegend": False
+   #                }
+   #             )
+
+   #          for platform_type in node_x:
+   #             nodes_traces.append(
+   #                {
+   #                   "type": "scatter",
+   #                   "name": platform_type,
+   #                   "x": node_x[platform_type],
+   #                   "y": node_y[platform_type],
+   #                   "mode": "markers",
+   #                   "zorder": 2,
+   #                   "customdata": node_text[platform_type],
+   #                   "hovertemplate":'%{customdata}',
+   #                   "marker":
+   #                   {
+   #                      "size": 20,
+   #                   },
+   #                }
+   #             )
+
+   #          fig =  go.Figure({"data": nodes_traces + edge_traces + directions, "layout": self._empty_plot})
+
+   #          return fig
+   #       
+   #       else:
+   #          return go.Figure({"data": None, "layout": self._empty_plot})
+
+
+
+   def _define_plot_select_callback(self):
+
+      @self._app.callback(
+         Output("plots-area", "children"),
+         Output("plot-filters", "children"),
+         Input("plot-options", "value")
+      )
+      def select_plot(plot_option):
+
+         option = self._plots_options[plot_option]
+
+         return option["Graph"], option["Options"]
 
 
    def _define_time_button_callback(self):
@@ -1093,6 +1347,7 @@ class AFSIMCommsInspector:
       #    empty_dataframe['zIndex'] = '2'
       #    empty_dataframe['backgroundColor'] = 'pink'
       #    return no_update, empty_dataframe, "Filters Produced Empty Dataframe.", no_update, no_update, no_update, no_update
+
 
    def _define_filter_storage_callback(self):
 
