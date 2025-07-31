@@ -104,6 +104,7 @@ class NetworkPlot:
          "x": [start[0], end[0]],
          "y": [start[1], end[1]],
          "mode": "lines",
+         "hoverinfo": "none",
          "zorder": 1,
          "line": 
          {
