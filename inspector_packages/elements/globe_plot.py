@@ -1,8 +1,7 @@
 import pickle, warnings
 from pathlib import Path
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+from inspector_packages import *
 import pdb
 
 class GlobePlot:
@@ -58,7 +57,7 @@ class GlobePlot:
 
    def _load_earth_data(self, land_color=None, ocean_color=None, resolution=None):
 
-      earth_data = self._current_file.parent.parent.joinpath("earth_data")
+      earth_data = self._current_file.parent.parent.parent.joinpath("earth_data")
       self._earth_image = np.load(earth_data.joinpath(f"earth_image_{resolution}.npy"))
       if land_color is not None and ocean_color is not None:
          cutoff = 0.24285714285714285

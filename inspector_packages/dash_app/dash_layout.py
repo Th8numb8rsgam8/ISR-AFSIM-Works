@@ -1,3 +1,4 @@
+from . import *
 import dash_bootstrap_components as dbc
 from dash import dcc, html, Dash
 
@@ -12,7 +13,7 @@ class DashLayout:
       self._network_plot_name = network_plot_name
 
       self._app = Dash(
-         title="AFSIM Communications Inspector",
+         title=APP_NAME,
          external_stylesheets=[
             '/static/styles.css',
             '/static/bootstrap.min.css'
@@ -30,7 +31,7 @@ class DashLayout:
    def initialize_barplot(self):
 
       barplot = dcc.Graph(
-         id='bar-graph', 
+         id=BAR_GRAPH, 
          config={"scrollZoom": False}, 
          style={'height': '200vh'}
       )
@@ -53,9 +54,9 @@ class DashLayout:
          "CommInteraction_FailedStatus", "Queue_Size"]
 
       barplot_dropdowns = dbc.AccordionItem([
-         self._create_dropdown("Subplot Category", "subplot-category", subplot_options, False, None, "Event_Type", False),
-         self._create_dropdown("Bar Graph Category", "bar-graph-category", subplot_options, False, None, "Sender_Name", False),
-         self._create_dropdown("Bar Stack Category", 'bar-stack-category', subplot_options, False, None, "Receiver_Name", False)
+         self._create_dropdown("Subplot Category", SUBPLOT_CATEGORY, subplot_options, False, None, "Event_Type", False),
+         self._create_dropdown("Bar Graph Category", BAR_GRAPH_CATEGORY, subplot_options, False, None, "Sender_Name", False),
+         self._create_dropdown("Bar Stack Category", BAR_STACK_CATEGORY, subplot_options, False, None, "Receiver_Name", False)
       ], title="Bar Charts Options")
 
       return barplot_dropdowns
@@ -76,7 +77,7 @@ class DashLayout:
       network_options = ["Spring", "Circular", "Shell", "Spectral", "Random", "Kamada Kawai", "Multipartite"]
 
       network_dropdowns = dbc.AccordionItem([
-         self._create_dropdown("Network Layout", "network-layout", network_options, False, None, "Spring", False),
+         self._create_dropdown("Network Layout", NETWORK_LAYOUT, network_options, False, None, "Spring", False),
       ], title="Network Options")
 
       return network_dropdowns
@@ -87,7 +88,7 @@ class DashLayout:
       self._app.layout = dcc.Loading(
          children=[
             html.Div(
-               id="main-display",
+               id=MAIN_DISPLAY,
                children=[
                   self._create_classification_markings("top"),
                   self._create_dataframe_message(),
@@ -96,10 +97,10 @@ class DashLayout:
                   self._create_classification_markings("bottom"),
                ]
             ),
-            dcc.Store(id="filter-memory"),
-            dcc.Store(id="display-memory")
+            dcc.Store(id=FILTER_MEMORY),
+            dcc.Store(id=DISPLAY_MEMORY)
          ],
-         target_components={"main-display": "children"},
+         target_components={MAIN_DISPLAY: "children"},
       )
 
 
@@ -126,7 +127,7 @@ class DashLayout:
    def _create_displayed_data_row(self):
 
       displayed_data = dbc.Row(
-         id="displayed-data",
+         id=DISPLAYED_DATA,
          style={
             'display': 'flex',
             'zIndex': '1'
@@ -138,7 +139,7 @@ class DashLayout:
                self._create_time_buttons()
             ], width=6),
             dbc.Col([
-               self._create_dropdown("Plots", "plot-options", ["Bar Plot", "Network Plot"], False, False, "Bar Plot", False),
+               self._create_dropdown("Plots", PLOT_OPTIONS, ["Bar Plot", "Network Plot"], False, False, "Bar Plot", False),
                self._create_plots_area(),
                self._create_time_label(),
                self._create_button_group()
@@ -151,7 +152,7 @@ class DashLayout:
    def _create_options_row(self):
 
       options_row = dbc.Row(
-         id="options-row",
+         id=OPTIONS_ROW,
          style={
             'position': 'relative',
             'textAlign': 'center',
@@ -192,7 +193,7 @@ class DashLayout:
    def _create_globe_visual(self):
 
       graph = dcc.Graph(
-         id='my-graph', 
+         id=GLOBE_GRAPH, 
          config={"scrollZoom": True}, 
          style={'height': '80vh'})
 
@@ -206,7 +207,7 @@ class DashLayout:
          slider_marks[val] = '' 
 
       slider = dcc.Slider(
-         id="time-slider",
+         id=TIME_SLIDER,
          min=self._timestamps[0], 
          max=self._timestamps[-1],
          step=None,
@@ -231,8 +232,8 @@ class DashLayout:
             'paddingBottom': '20px'
          },
          children=[
-            dbc.Button("Previous Time", id="previous-time", color="primary"),
-            dbc.Button("Next Time", id="next-time", color="primary")
+            dbc.Button("Previous Time", id=PREVIOUS_TIME, color="primary"),
+            dbc.Button("Next Time", id=NEXT_TIME, color="primary")
          ]
       )
 
@@ -243,14 +244,14 @@ class DashLayout:
 
       bar_plots = dcc.Loading(
          children=[html.Div(
-            id='plots-area',
+            id=PLOTS_AREA,
             style={
                'overflowY': 'scroll',
                'height': '80vh'
             },
          )],
          target_components={
-            "bar-graph": "figure",
+            BAR_GRAPH: "figure",
             self._network_plot_name: "figure"},
          type="graph"
       )
@@ -261,7 +262,7 @@ class DashLayout:
    def _create_time_label(self):
 
       time_label = html.Div(
-         id='time-label',
+         id=TIME_LABEL,
          style={
             'textAlign': 'center',
             'fontWeight': 'bold',
@@ -288,7 +289,7 @@ class DashLayout:
                children=[
                   html.Div(
                      dbc.RadioItems(
-                     id="radios",
+                     id=RADIOS,
                      className="btn-group",
                      inputClassName="btn-check",
                      labelClassName="btn btn-outline-primary",
@@ -312,22 +313,22 @@ class DashLayout:
 
       filter_options = dbc.Accordion(
          children=[dbc.AccordionItem([
-            self._create_dropdown("Event Type", "event-type", self._df["Event_Type"].unique(), True, "All Events"),
-            self._create_dropdown("Message Serial Number", "msg-serial-number", self._df["Message_SerialNumber"].unique(), True, "All Serial Numbers"),
-            self._create_dropdown("Message Originator", "msg-originator", self._df["Message_Originator"].unique(), True, "All Originators"),
-            self._create_dropdown("Message Type", "msg-type", self._df["Message_Type"].unique(), True, "All Message Types"),
-            self._create_dropdown("Sender", "sender-name", self._df["Sender_Name"].unique(), True, "All Senders"),
-            self._create_dropdown("Sender Type", "sender-type", self._df["Sender_Type"].unique(), True, "All Sender Types"),
-            self._create_dropdown("Sender BaseType", "sender-basetype", self._df["Sender_BaseType"].unique(), True, "All Sender BaseTypes"),
-            self._create_dropdown("Sender Part", "sender-part", self._df["SenderPart_Name"].unique(), True, "All Sender Parts"),
-            self._create_dropdown("Sender Part Type", "sender-part-type", self._df["SenderPart_Type"].unique(), True, "All Sender Part Types"),
-            self._create_dropdown("Sender Part BaseType", "sender-part-basetype", self._df["SenderPart_BaseType"].unique(), True, "All Sender Part BaseTypes"),
-            self._create_dropdown("Receiver", "receiver-name", self._df["Receiver_Name"].unique(), True, "All Receivers"),
-            self._create_dropdown("Receiver Type", "receiver-type", self._df["Receiver_Type"].unique(), True, "All Receiver Types"),
-            self._create_dropdown("Receiver BaseType", "receiver-basetype", self._df["Receiver_BaseType"].unique(), True, "All Receiver BaseTypes"),
-            self._create_dropdown("Receiver Part", "receiver-part", self._df["ReceiverPart_Name"].unique(), True, "All Receiver Parts"),
-            self._create_dropdown("Receiver Part Type", "receiver-part-type", self._df["ReceiverPart_Type"].unique(), True, "All Receiver Part Types"),
-            self._create_dropdown("Receiver Part BaseType", "receiver-part-basetype", self._df["ReceiverPart_BaseType"].unique(), True, "All Receiver Part BaseTypes"),
+            self._create_dropdown("Event Type", EVENT_TYPE, self._df["Event_Type"].unique(), True, "All Events"),
+            self._create_dropdown("Message Serial Number", MSG_SERIAL_NUMBER, self._df["Message_SerialNumber"].unique(), True, "All Serial Numbers"),
+            self._create_dropdown("Message Originator", MSG_ORIGINATOR, self._df["Message_Originator"].unique(), True, "All Originators"),
+            self._create_dropdown("Message Type", MSG_TYPE, self._df["Message_Type"].unique(), True, "All Message Types"),
+            self._create_dropdown("Sender", SENDER_NAME, self._df["Sender_Name"].unique(), True, "All Senders"),
+            self._create_dropdown("Sender Type", SENDER_TYPE, self._df["Sender_Type"].unique(), True, "All Sender Types"),
+            self._create_dropdown("Sender BaseType", SENDER_BASETYPE, self._df["Sender_BaseType"].unique(), True, "All Sender BaseTypes"),
+            self._create_dropdown("Sender Part", SENDER_PART, self._df["SenderPart_Name"].unique(), True, "All Sender Parts"),
+            self._create_dropdown("Sender Part Type", SENDER_PART_TYPE, self._df["SenderPart_Type"].unique(), True, "All Sender Part Types"),
+            self._create_dropdown("Sender Part BaseType", SENDER_PART_BASETYPE, self._df["SenderPart_BaseType"].unique(), True, "All Sender Part BaseTypes"),
+            self._create_dropdown("Receiver", RECEIVER_NAME, self._df["Receiver_Name"].unique(), True, "All Receivers"),
+            self._create_dropdown("Receiver Type", RECEIVER_TYPE, self._df["Receiver_Type"].unique(), True, "All Receiver Types"),
+            self._create_dropdown("Receiver BaseType", RECEIVER_BASETYPE, self._df["Receiver_BaseType"].unique(), True, "All Receiver BaseTypes"),
+            self._create_dropdown("Receiver Part", RECEIVER_PART, self._df["ReceiverPart_Name"].unique(), True, "All Receiver Parts"),
+            self._create_dropdown("Receiver Part Type", RECEIVER_PART_TYPE, self._df["ReceiverPart_Type"].unique(), True, "All Receiver Part Types"),
+            self._create_dropdown("Receiver Part BaseType", RECEIVER_PART_BASETYPE, self._df["ReceiverPart_BaseType"].unique(), True, "All Receiver Part BaseTypes"),
             ], title="Filter Options")],
             start_collapsed=True
          )
@@ -337,7 +338,7 @@ class DashLayout:
 
    def _create_plot_filters(self):
 
-      subplot_filters = dbc.Accordion(id="plot-filters", start_collapsed=True)
+      subplot_filters = dbc.Accordion(id=PLOT_FILTERS, start_collapsed=True)
 
       return subplot_filters 
 

@@ -1,6 +1,7 @@
 import sys
 import networkx as nx
-import plotly.graph_objects as go
+from inspector_packages import *
+
 
 class NetworkPlot:
 
@@ -33,7 +34,6 @@ class NetworkPlot:
       node_positions = self._get_network_layout(frame, network_layout)
 
       node_x, node_y, node_text, nodes_visited = {}, {}, {}, []
-      edge_width = []
       nodes_traces, edge_traces, directions = [], [], []
       for transmission, group in frame.groupby(["Sender_Name", "Receiver_Name"]):
 
@@ -86,7 +86,7 @@ class NetworkPlot:
 
    def _get_edge_width(self, num):
 
-      edge_width = 1
+      edge_width = 0.25 
       for rng_step in self._edge_width:
          min_rng, max_rng = rng_step["range"]
          if min_rng < num <= max_rng:
